@@ -802,11 +802,12 @@
             mouseDownState = null;
         }
         function onMouseMove(ev){
+            const anglePerPixel = 2 * starChart.getFOV() / cv.height;
             if(mouseDownState){
                 ev.preventDefault();
                 starChart.setViewDir(
-                    mouseDownState.viewAz - (ev.clientX - mouseDownState.x),
-                    mouseDownState.viewEl + (ev.clientY - mouseDownState.y));
+                    mouseDownState.viewAz - (ev.clientX - mouseDownState.x) * anglePerPixel,
+                    mouseDownState.viewEl + (ev.clientY - mouseDownState.y) * anglePerPixel);
             }
         }
         function onMouseWheel(ev){
