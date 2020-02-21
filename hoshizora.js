@@ -236,12 +236,11 @@
             }
             onResizeWindow();
 
-            const useWebGL = true;
-            if(useWebGL){
-                renderer = new WebGLRenderer(cv, stars);
+            if(options.renderer == "2d"){
+                renderer = new Canvas2DRenderer(cv, stars);
             }
             else{
-                renderer = new Canvas2DRenderer(cv, stars);
+                renderer = new WebGLRenderer(cv, stars);
             }
             drawFrame();
         }
@@ -872,7 +871,10 @@
                 case "az":
                 case "el":
                 case "lng":
-                case "lat": options[key] = parseFloat(value); break;
+                case "lat":
+                    options[key] = parseFloat(value); break;
+                case "renderer":
+                    options[key] = value; break;
                 }
             }
         }
