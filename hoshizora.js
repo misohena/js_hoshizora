@@ -653,7 +653,7 @@
     }
 
     function calculateAppearanceOfStar(mag, bv){
-        const MAX_MAG = 4.0; // magnitude where intensity==INTENSITY_SCALE
+        const MAX_MAG = 3.0; // magnitude where intensity==INTENSITY_SCALE
         const INTENSITY_SCALE = 1;
         const INTENSITY_MAX = 10;
         const INTENSITY_MIN = 0.0;
