@@ -1,0 +1,21 @@
+* hoshizora.js
+
+星空を描画します。
+
+** デモ
+
+https://misohena.github.io/js_hoshizora/hoshizora.html
+
+** オプション(クエリ文字列)
+
+| ra  | 画面の中心となる赤経                                              |
+| dec | 画面の中心となる赤偉                                              |
+| lat | 観測者の緯度                                                      |
+| lng | 観測者の経度                                                      |
+| az  | 画面の中心となる方位角(raとdecが指定されている場合はそちらを優先) |
+| el  | 画面の中心となる仰角(raとdecが指定されている場合はそちらを優先)   |
+| fov | 視野角                                                            |
+
+*** 例:シリウスを画面の中心に表示
+
+https://misohena.github.io/js_hoshizora/hoshizora.html?ra=101.288541052&dec=-16.7131430626
