@@ -186,6 +186,7 @@
         }
         function setFOV(fov)
         {
+            fov = clamp(fov, 30, 120);
             if(fov != fovY){
                 fovY = fov;
                 updateProjectionMatrix();
@@ -194,7 +195,7 @@
         }
         function setFOVDelta(delta)
         {
-            setFOV(clamp(fovY + delta, 30, 120));
+            setFOV(fovY + delta);
         }
 
         if(typeof(options.ra)=="number" && typeof(options.dec)=="number"){
@@ -208,9 +209,9 @@
         function updateViewMatrix(){
             matView = M4.mulM4(M4.rotX(-viewEl * DEG2RAD), M4.rotY((180+viewAz) * DEG2RAD));
         }
-        function setViewDir(dir){
-            viewAz = dir.az;
-            viewEl = dir.el;
+        function setViewDir(az, el){
+            viewAz = az;
+            viewEl = clamp(el, -120, 120); //more than 90 degrees to see behind
             updateViewMatrix();
             drawFrame();
         }
@@ -258,11 +259,13 @@
         setupCanvas();
 
         // public
-        this.setViewDir = setViewDir;
+        this.getCV = function(){return cv;};
+        this.getFOV = function(){return fovY;};
+        this.setFOV = setFOV;
+        this.zoom = setFOVDelta;
         this.getViewAz = function(){return viewAz;};
         this.getViewEl = function(){return viewEl;};
-        this.getCV = function(){return cv;};
-        this.zoom = setFOVDelta;
+        this.setViewDir = setViewDir;
     }//StarChart
 
     //
@@ -688,26 +691,123 @@
 
     function StarChartController(starChart){
         const cv = starChart.getCV();
-        cv.addEventListener("mousedown", onMouseDown);
-        cv.addEventListener("mouseup", onMouseUp);
-        cv.addEventListener("mousemove", onMouseMove);
-        cv.addEventListener("wheel", onMouseWheel);
-        var mouseDownPos = null;
+
+        //
+        // Touch
+        //
+        const currentTouches = [];
+        function findCurrentTouchById(id){
+            return currentTouches.findIndex((t)=>t.id==id);
+        }
+        function averageXY(touches){
+            let x = 0, y = 0;
+            for(let i = 0; i < touches.length; ++i){
+                x += touches[i].x;
+                y += touches[i].y;
+            }
+            return {x: x / touches.length,
+                    y: y / touches.length};
+        }
+
+        let touchStartState;
+        function refreshTouchStartState(){
+            touchStartState = {
+                fov: starChart.getFOV(),
+                viewAz: starChart.getViewAz(),
+                viewEl: starChart.getViewEl(),
+                touches: currentTouches.slice(),
+                center: averageXY(currentTouches)
+            };
+        }
+
+        cv.addEventListener("touchstart", onTouchStart, false);
+        cv.addEventListener("touchend", onTouchEnd, false);
+        cv.addEventListener("touchcancel", onTouchCancel, false);
+        cv.addEventListener("touchmove", onTouchMove, false);
+        function onTouchStart(ev){
+            ev.preventDefault();
+            const touches = ev.changedTouches;
+            for(let ti = 0; ti < touches.length; ++ti){
+                currentTouches.push({
+                    id: touches[ti].identifier,
+                    x: touches[ti].clientX,
+                    y: touches[ti].clientY,
+                });
+            }
+            refreshTouchStartState();
+        }
+        function onTouchEnd(ev){
+            ev.preventDefault();
+            const touches = ev.changedTouches;
+            for(let ti = 0; ti < touches.length; ++ti){
+                const index = findCurrentTouchById(touches[ti].identifier);
+                if(index >= 0){
+                    currentTouches.splice(index);
+                }
+            }
+            refreshTouchStartState();
+        }
+        function onTouchCancel(ev){
+            onTouchEnd(ev);
+        }
+        function onTouchMove(ev){
+            ev.preventDefault();
+            const touches = ev.changedTouches;
+            for(let ti = 0; ti < touches.length; ++ti){
+                const index = findCurrentTouchById(touches[ti].identifier);
+                if(index >= 0){
+                    currentTouches[index] = {
+                        id: touches[ti].identifier,
+                        x: touches[ti].clientX,
+                        y: touches[ti].clientY,
+                    };
+                }
+            }
+
+            const anglePerPixel = 120 / cv.height;
+            // Move
+            if(currentTouches.length >= 1 && touchStartState.touches.length >= 1){
+                const currCenter = averageXY(currentTouches);
+                const dx = (currCenter.x - touchStartState.center.x) * anglePerPixel;
+                const dy = (currCenter.y - touchStartState.center.y) * anglePerPixel;
+                starChart.setViewDir(
+                    touchStartState.viewAz - dx,
+                    touchStartState.viewEl + dy);
+            }
+
+            // Zoom
+            if(currentTouches.length >= 2 && touchStartState.touches.length >= 2){
+                const startDistanceX = touchStartState.touches[0].x - touchStartState.touches[1].x;
+                const startDistanceY = touchStartState.touches[0].y - touchStartState.touches[1].y;
+                const startDistance = Math.sqrt(startDistanceX*startDistanceX + startDistanceY*startDistanceY);
+                const currDistanceX = currentTouches[0].x - currentTouches[1].x;
+                const currDistanceY = currentTouches[0].y - currentTouches[1].y;
+                const currDistance = Math.sqrt(currDistanceX*currDistanceX + currDistanceY*currDistanceY);
+                const delta = (currDistance - startDistance) * anglePerPixel;
+                starChart.setFOV(touchStartState.fov - delta);
+            }
+        }
+
+        // Mouse
+        cv.addEventListener("mousedown", onMouseDown, false);
+        cv.addEventListener("mouseup", onMouseUp, false);
+        cv.addEventListener("mousemove", onMouseMove, false);
+        cv.addEventListener("wheel", onMouseWheel, false);
+        var mouseDownState = null;
         function onMouseDown(ev){
             ev.preventDefault();
-            mouseDownPos = {x:ev.clientX, y:ev.clientY, viewAz:starChart.getViewAz(), viewEl:starChart.getViewEl()};
+            mouseDownState = {x:ev.clientX, y:ev.clientY, viewAz:starChart.getViewAz(), viewEl:starChart.getViewEl()};
         }
         function onMouseUp(ev){
             ev.preventDefault();
-            mouseDownPos = null;
+            mouseDownState = null;
         }
         function onMouseMove(ev){
-            ///@todo マウスカーソルの位置がmousedownした天球上の点を指し続けるようにすべき。
-            if(mouseDownPos){
+            if(mouseDownState){
                 ev.preventDefault();
-                starChart.setViewDir({
-                    az: mouseDownPos.viewAz - (ev.clientX - mouseDownPos.x),
-                    el: Math.max(-120, Math.min(120, mouseDownPos.viewEl + (ev.clientY - mouseDownPos.y)))}); //プラネタリウムで見る時みたいに天頂より少し後ろまで傾斜出来るようにする。
+                starChart.setViewDir(
+                    mouseDownState.viewAz - (ev.clientX - mouseDownState.x),
+                    mouseDownState.viewEl + (ev.clientY - mouseDownState.y));
             }
         }
         function onMouseWheel(ev){
